@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Procesar Excel a JSON y PHP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 300px; margin-top: 20px; }
+    button { margin-top: 10px; margin-right: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>Procesar Excel y generar JSON / PHP</h2>
+
+<input type="file" id="input-excel" accept=".xlsx, .xls" />
+<br>
+<button onclick="procesarExcel()">Procesar Excel</button>
+<button onclick="descargarJSON()">Descargar JSON</button>
+<button onclick="generarPHPArray()">Generar PHP Array</button>
+<button onclick="exportarAExcel()">Exportar a Excel</button>
+
+<textarea id="output" placeholder="Aquí aparecerá el JSON o el array PHP..."></textarea>
+
+<script>
+// Áreas de trabajo válidas
+const practiceAreas = [
+            'Aduanas y Comercio Exterior',
+            'Fiscal (Litigio)',
+            'Ambiental',
+            'M&A, Private Equity',
+            'Fiscal',
+            'Arbitraje y Litigio Mercantil',
+            'Tecnología, Medios, Telecomunicaciones e IA',
+            'Laboral',
+            'Competencia, Compliance, Industrias Reguladas',
+            'Bancario, Financiero, Mercado de Capitales y Seguros',
+            'Ciencias de la Vida',
+            'Inmobiliario',
+            'Energía',
+            'Gestión Patrimonial',
+            'Infraestructura',
+            'Litigio Administrativo',
+            'Insolvencia',
+            'Baja',
+            'Propiedad Intelectual',
+            'Servicios Corporativos',
+            '0In0fraestructura / Ciencias de la 0Vida',
+            'M&A, Private Equity / Servicios Corporativo0s / 0Tecnología, Medios, Telecomunicaciones e IA',
+            'M&A, Private Equity / Minería',
+            'Fiscal / Gestión Patrimoni0al',
+            'Bancario, Financiero, Mercado de Capitales y Seguros / Inmobiliari0',
+            'Inmobiliari0 / M&A, Private Equity',
+            'M&A, Private Equity / Reestructuras / Insolvencia',
+            'Dirección Jurídica',
+            'Secretarias',
+            'Dirección de BD, Comunicación y Marketing',
+            'Dirección de Administración y finanzas',
+            'Facturación y cobranza',
+            'Travel Solutions',
+            'TI',
+            'Contabilidad',
+            'Capital Humano',
+            'Servicios generales',
+            'Recepción',
+            'Tesoreria',
+            'Paralegal',
+            'Fusiones y Adquisiciones',
+            'Reestructuras e Insolvencia',
+];
+
+const OFFSET = 1;
+let resultado = [];
+let fileExcel = null;
+
+// Captura archivo
+document.getElementById('input-excel').addEventListener('change', function(e) {
+  fileExcel = e.target.files[0];
+});
+
+// Procesar Excel
+function procesarExcel() {
+  if (!fileExcel) {
+    alert('Primero selecciona un archivo Excel.');
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
+
+    resultado = json.map(row => {
+        const areaRaw = row['Área de Práctica'] || '';
+        const equipoRaw = row['Equipo de trabajo'] || '';
+
+        const areaIndex = practiceAreas.indexOf(areaRaw.trim());
+        let work_team = null;
+
+        if (areaIndex !== -1) {
+            work_team = areaIndex + OFFSET;
+        } else {
+            const equipoIndex = practiceAreas.indexOf(equipoRaw.trim());
+            if (equipoIndex !== -1) {
+                work_team = equipoIndex + OFFSET;
+            }
+        }
+
+
+      const firstName = row['first_name'] || '';
+      const lastName = row['last_name'] || '';
+      const email = row['email'] || '';
+      const nameImage = row['avatar'] || '';
+
+      return {
+        name: row['name'] || '',
+        email: email,
+        last_name: lastName,
+        first_name: firstName,
+        number: row['number'] || '',
+        directory_name: row['directory_name'] || '',
+        direct_number: row['direct_number'] || '',
+        birthdate: row['birthdate'] || '',
+        avatar: row['avatar'] || '',
+        bio: '',
+        map_section: row['map_section'] || '',
+        type_user: row['type_user'] || '',
+        work_team: work_team,
+        life_insurance: row['VIDA'] || '',
+        medical_insurance: row['GASTOS MÉDICOS'] || '',
+        password: `${lastName},${firstName}`,
+        position: row['Especialidad'] || '',
+      };
+    });
+
+    document.getElementById('output').value = JSON.stringify(resultado, null, 2);
+  };
+
+  reader.readAsArrayBuffer(fileExcel);
+}
+
+// Formato de fecha
+function formatDate(fecha) {
+  if (typeof fecha === 'number') {
+    const excelStart = new Date(Date.UTC(1899, 11, 30));
+    const realDate = new Date(excelStart.getTime() + fecha * 86400000);
+    return realDate.toISOString().split('T')[0];
+  }
+
+  if (typeof fecha === 'string') {
+    const parts = fecha.split(/[\/\-]/);
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      const year = y.length === 2 ? (parseInt(y) > 30 ? '19' + y : '20' + y) : y;
+      return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
+// Descargar JSON
+function descargarJSON() {
+  const blob = new Blob([JSON.stringify(resultado, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'usuarios.json';
+  a.click();
+}
+
+// Generar PHP array plano
+function generarPHPArray() {
+  if (!resultado.length) {
+    alert('Primero procesa un archivo Excel.');
+    return;
+  }
+
+  const phpArray = resultado.map(user => {
+    return `  [
+    'name' => '${user.name}',
+    'email' => '${user.email}',
+    'last_name' => '${user.last_name}',
+    'first_name' => '${user.first_name}',
+    'number' => '${user.number}',
+    'directory_name' => '${user.directory_name}',
+    'direct_number' => '${user.direct_number}',
+    'birthdate' => '${user.birthdate}',
+    'avatar' => '${user.avatar}',
+    'map_section' => '${user.map_section}',
+    'type_user' => '${user.type_user}',
+    'work_team' => ${user.work_team},
+    'position' => '${user.position}',
+    'life_insurance' => '${user.life_insurance}',
+    'medical_insurance' => '${user.medical_insurance}',
+    'password' => '${user.password}',
+  ]`;
+  }).join(',\n\n');
+
+  document.getElementById('output').value = `<?php\n\n$users = [\n\n${phpArray}\n\n];`;
+}
+
+function exportarAExcel() {
+  if (!resultado.length) {
+    alert('Primero procesa un archivo Excel.');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(resultado);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Usuarios");
+
+  const hoy = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const nombreArchivo = `${hoy}_galicia_users.xlsx`;
+
+  XLSX.writeFile(wb, nombreArchivo);
+}
+
+</script>
+
+</body>
+</html>

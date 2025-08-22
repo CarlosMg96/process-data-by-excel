@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Fusionar Excel con array PHP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 300px; margin-top: 20px; white-space: pre; font-family: monospace; }
+    button { margin-top: 10px; margin-right: 10px; }
+    label { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h2>Fusionar Excel con array PHP</h2>
+
+<label>1. Cargar archivo Excel con datos:</label><br>
+<input type="file" id="input-excel" accept=".xlsx, .xls" />
+<br><br>
+
+<label>2. Pega aquí tu array PHP:</label>
+<textarea id="php-input" placeholder="Pega aquí el array PHP..."></textarea>
+
+<button onclick="fusionarDatos()">Fusionar</button>
+<button onclick="generarPHP()">Generar PHP Final</button>
+
+<textarea id="output" placeholder="Aquí aparecerá el array PHP final..."></textarea>
+
+<script>
+let excelData = [];
+
+// Leer Excel
+document.getElementById('input-excel').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    excelData = XLSX.utils.sheet_to_json(sheet);
+    alert("✅ Excel cargado correctamente.");
+  };
+
+  reader.readAsArrayBuffer(file);
+});
+
+// Función principal
+function fusionarDatos() {
+  const phpRaw = document.getElementById('php-input').value;
+  if (!phpRaw.trim()) {
+    alert("❗ Pega tu array PHP primero.");
+    return;
+  }
+
+  if (!excelData.length) {
+    alert("❗ Carga un archivo Excel primero.");
+    return;
+  }
+
+  // Convertimos el array PHP en un array JS de forma flexible
+  const userBlocks = phpRaw.split(/\n\s*\],\s*\n/); // Dividir por bloque de usuarios
+  const users = [];
+
+  for (let block of userBlocks) {
+    const user = {};
+    const lines = block.match(/'[^']+' *=> *[^,]+/g);
+    if (!lines) continue;
+
+    for (let line of lines) {
+      const match = line.match(/'([^']+)' *=> *(.*)/);
+      if (!match) continue;
+
+      const key = match[1];
+      let value = match[2].trim();
+
+      // Quitar bcrypt() y dejar solo el texto interior
+     // Limpieza del valor
+      if (value.startsWith('bcrypt(')) {
+        const inner = value.match(/bcrypt\('([^']+)'\)/);
+        value = inner ? inner[1] : '';
+      } else {
+        // Eliminar comillas simples externas y limpiar dobles
+        value = value.replace(/^'+/, '').replace(/'+$/, '');
+      }
+
+
+
+      user[key] = value;
+    }
+
+    if (user.email) users.push(user);
+  }
+
+  // Mapear Excel por correo
+  const excelPorCorreo = {};
+  for (const row of excelData) {
+    const correo = (row['Correo'] || '').trim().toLowerCase();
+    if (correo) {
+      excelPorCorreo[correo] = row;
+    }
+  }
+
+  // Fusionar datos
+  const fusionados = users.map(user => {
+    const email = (user.email || '').trim().toLowerCase();
+    const excelRow = excelPorCorreo[email];
+
+    return {
+      ...user,
+      password: user.last_name || '',
+      medical_insurance: excelRow ? (excelRow['GASTOS MÉDICOS'] || '') : '',
+      life_insurance: excelRow ? (excelRow['VIDA'] || '') : ''
+    };
+  });
+
+  window.listaFusionada = fusionados;
+  document.getElementById('output').value = "// ✅ Lista fusionada. Presiona 'Generar PHP Final'";
+}
+
+// Generar array PHP
+function generarPHP() {
+  const lista = window.listaFusionada || [];
+  if (!lista.length) {
+    alert('❗ Primero fusiona los datos.');
+    return;
+  }
+
+  const phpArray = lista.map(user => {
+    const campos = Object.entries(user).map(([key, val]) => {
+      return `    '${key}' => '${val}'`;
+    }).join(',\n');
+
+    return `  [\n${campos}\n  ]`;
+  }).join(',\n\n');
+
+  document.getElementById('output').value = `<?php\n\n$users = [\n\n${phpArray}\n\n];`;
+}
+</script>
+
+</body>
+</html>
