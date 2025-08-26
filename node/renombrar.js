@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Ruta de la carpeta que quieres procesar
-const carpetaObjetivo = '/Users/carlosrodriguez/Downloads/polizas-18ago/POLI_GASTOS_MEDICOS';
+const carpetaObjetivo = '/#';
 
 function reemplazarEspaciosPorGuiones(dir) {
   // Leer todos los elementos de la carpeta
