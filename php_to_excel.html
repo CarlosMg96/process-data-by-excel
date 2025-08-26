@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Convertir array PHP a Excel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 300px; margin-top: 10px; white-space: pre; font-family: monospace; }
+    button { margin-top: 10px; margin-right: 10px; padding: 10px 15px; }
+    label { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h2>Convertir array PHP a Excel</h2>
+
+<label>Pega aquí tu array PHP:</label>
+<textarea id="php-input" placeholder="Pega aquí tu array PHP estilo Laravel..."></textarea>
+
+<br>
+<button onclick="convertirYDescargar()">Convertir y descargar Excel</button>
+
+<script>
+function convertirYDescargar() {
+  const phpRaw = document.getElementById('php-input').value;
+  if (!phpRaw.trim()) {
+    alert("❗ Pega tu array PHP primero.");
+    return;
+  }
+
+  const userBlocks = phpRaw.split(/\n\s*\],\s*\n/); // Dividir por usuarios
+  const users = [];
+
+  for (let block of userBlocks) {
+    const user = {};
+    const lines = block.match(/'[^']+' *=> *[^,]+/g);
+    if (!lines) continue;
+
+    for (let line of lines) {
+      const match = line.match(/'([^']+)' *=> *(.*)/);
+      if (!match) continue;
+
+      const key = match[1];
+      let value = match[2].trim();
+
+      // Limpiar valor
+      if (value.startsWith('bcrypt(')) {
+        const inner = value.match(/bcrypt\('([^']+)'\)/);
+        value = inner ? inner[1] : '';
+      } else {
+        value = value.replace(/^'+/, '').replace(/'+$/, '');
+      }
+
+      user[key] = value;
+    }
+
+    if (Object.keys(user).length > 0) users.push(user);
+  }
+
+  if (!users.length) {
+    alert("❗ No se detectaron usuarios válidos en el array PHP.");
+    return;
+  }
+
+  // Convertir a hoja de Excel
+  const ws = XLSX.utils.json_to_sheet(users);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Usuarios");
+
+  // Descargar archivo
+  XLSX.writeFile(wb, "usuarios_convertidos.xlsx");
+
+  alert("✅ Archivo Excel generado correctamente.");
+}
+</script>
+
+</body>
+</html>
