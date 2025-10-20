@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Procesador de Excel a PHP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+    textarea { width: 100%; height: 600px; margin-top: 20px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h2>Convertidor Excel a PHP Array</h2>
+  <input type="file" id="fileInput" accept=".xlsx, .xls" />
+  <textarea id="output" placeholder="El resultado en formato PHP aparecerá aquí..."></textarea>
+
+  <script>
+    function escapePHPString(str) {
+      return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function formatMultilineText(str) {
+      return escapePHPString(str)
+        .split('\n')
+        .map(line => line.trim())
+        .join('\\n');
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        let output = "[\n";
+
+        for (let i = 2; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row[1]) continue; // omitir filas vacías
+
+          const nombre = row[1]?.replace(/ELECT[OA]\b/i, '').trim() || '';
+          const organo = (row[0]?.trim() || '') + " (JDMANLEON)";
+          const postulante = [];
+          if (row[2]) postulante.push("Poder Ejecutivo");
+          if (row[3]) postulante.push("Poder Legislativo");
+          if (row[4]) postulante.push("Poder Judicial");
+          if (row[5]) postulante.push("En Funciones");
+
+          const educacion = row[6]?.toString().trim() || '';
+          const trayectoria = row[7]?.toString().trim() || '';
+          const experiencia = row[8]?.toString().toLowerCase().includes('no') ? 'false' : 'true';
+          const votos = row[9] ? row[9]?.toString().trim() : '0%';
+
+          output += "    [\n";
+          output += `        'nombre' => '${escapePHPString(nombre)}',\n`;
+          output += `        'organo' => '${escapePHPString(organo)}',\n`;
+          output += `        'postulante' => [${postulante.map(p => `'${p}'`).join(', ')}],\n`;
+          output += `        'genero' => '',\n`;
+          output += `        'educacion' => '${escapePHPString(educacion)}',\n`;
+          output += `        'trayectoria' => '${escapePHPString(trayectoria)}',\n`;
+          output += `        'logros' => '',\n`;
+          output += `        'Experiencia' => ${experiencia},\n`;
+          output += `        'por_voto_obtenidos' => '${votos}',\n`;
+          output += "    ],\n";
+        }
+
+        output += "];";
+        document.getElementById('output').value = output;
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+</body>
+</html>
