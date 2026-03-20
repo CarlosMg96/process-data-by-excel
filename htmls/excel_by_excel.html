@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unificador PRO</title>
+</head>
+<body>
+
+<input type="file" id="fileInput" multiple />
+<button onclick="procesar()">Generar Excel</button>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+// 🧠 TODAS las columnas de tu BD
+const DB_COLUMNS = [
+    "row_id","cliente","industria","rol","descripcion","acc_contra",
+    "contraparte","acc_cliente","otras","referido","comentarios",
+    "recordatorio","hora","rnd","mytime","sentby","de","exclusivo",
+    "item_id","hayconflicto","quienconflicto","cuandoconflicto",
+    "reporte","quienreporta","cuandoreporta","cc","despacho",
+    "oficina","abogado","foro","otrocliente"
+];
+
+// 🔁 Mapeo Excel → BD
+const MAP = {
+    "Fecha": "mytime",
+    "De: Socio o Consejero responsable": "de",
+    "CC: dar visibilidad a": "cc",
+    "Cliente": "cliente",
+    "Industria Sector": "industria",
+    "Nuestro Rol": "rol",
+    "Descripción de la Operación": "descripcion",
+    "Contraparte": "contraparte",
+    "Accionistas del Cliente": "acc_cliente",
+    "Accionistas de la Contraparte": "acc_contra",
+    "Otras personas Interesadas": "otras",
+    "Referido Por": "referido",
+    "Comentarios adicionales": "comentarios"
+};
+
+let archivos = [];
+
+document.getElementById("fileInput").addEventListener("change", e => {
+    archivos = e.target.files;
+});
+
+async function procesar() {
+    let resultado = [];
+
+    for (let file of archivos) {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+
+        workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(sheet);
+
+            json.forEach(row => {
+
+                // 🧱 Crear estructura completa
+                let nuevaFila = {};
+                DB_COLUMNS.forEach(col => nuevaFila[col] = null);
+
+                // 🔁 Mapear datos reales
+                Object.keys(MAP).forEach(excelCol => {
+                    if (row[excelCol] !== undefined) {
+                        nuevaFila[MAP[excelCol]] = row[excelCol];
+                    }
+                });
+
+                // ⚙️ Valores por defecto (como tus ejemplos)
+                nuevaFila["recordatorio"] = "6hr";
+                nuevaFila["hora"] = "19:00";
+                nuevaFila["rnd"] = Math.floor(Math.random() * 1000000).toString();
+                nuevaFila["sentby"] = "sistema@auto.com";
+                nuevaFila["item_id"] = 1;
+                nuevaFila["hayconflicto"] = 0;
+                nuevaFila["quienconflicto"] = 0;
+                nuevaFila["quienreporta"] = 0;
+
+                // 📅 Fecha formato MySQL
+                if (nuevaFila["mytime"]) {
+                    let d = new Date(nuevaFila["mytime"]);
+                    nuevaFila["mytime"] = d.toISOString().slice(0, 19).replace("T", " ");
+                }
+
+                resultado.push(nuevaFila);
+            });
+        });
+    }
+
+    generarExcel(resultado);
+}
+
+function generarExcel(data) {
+    const worksheet = XLSX.utils.json_to_sheet(data, { header: DB_COLUMNS });
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "BD_FORMAT");
+
+    XLSX.writeFile(workbook, "formato_bd.xlsx");
+}
+</script>
+
+</body>
+</html>
